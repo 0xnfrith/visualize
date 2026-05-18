@@ -10,20 +10,24 @@ const SHAPE_UTILS = [DiagramShapeUtil];
 
 function App() {
   const onMount = useCallback((editor: Editor) => {
-    // Default new visitors to dark mode; respect any prior toggle that
-    // tldraw has persisted to localStorage. Tldraw is canonical for theme
-    // from here on — toggling Preferences -> Color scheme repaints every
-    // inlined diagram via the `.tl-theme__dark` ancestor class.
+    // First-visit default: force dark mode. This overrides the OS
+    // `prefers-color-scheme` for new visitors, who may prefer light. They
+    // can switch via Preferences -> Color scheme, which tldraw persists to
+    // localStorage; on subsequent visits the persisted value (`'light'`,
+    // `'dark'`, or `'system'`) is respected. Tldraw is canonical for theme
+    // from here on — toggling repaints every inlined diagram via the
+    // `.tl-theme__dark` ancestor class.
     if (editor.user.getUserPreferences().colorScheme == null) {
       editor.user.updateUserPreferences({ colorScheme: 'dark' });
     }
-    const socket = connectSocket(editor);
-    const detach = attachOperatorListeners(editor, socket);
+    const socketHandle = connectSocket(editor);
+    const detach = attachOperatorListeners(editor, socketHandle);
     // Tldraw doesn't unmount during a session, but if it ever does we'd
     // want to clean up — keep the references for hot-reload safety.
+    // `socketHandle.close()` stops the auto-reconnect chain in sync.ts.
     return () => {
       detach();
-      socket.close();
+      socketHandle.close();
     };
   }, []);
 

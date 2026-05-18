@@ -37,12 +37,18 @@ export async function renderD2(
   // Write source and close stdin so d2 sees EOF and starts compiling.
   // With stdin:'pipe' the FileSink is always available; the typed union
   // also includes raw fds for other config paths, which don't apply here.
-  const stdin = proc.stdin as unknown as {
-    write: (data: string) => unknown;
-    end: () => Promise<unknown>;
-  };
-  stdin.write(spec.source);
-  await stdin.end();
+  // Wrap to surface a broken pipe as structured `internalError` rather than
+  // an unhandled rejection (happens if d2 crashes mid-write).
+  try {
+    const stdin = proc.stdin as unknown as {
+      write: (data: string) => unknown;
+      end: () => Promise<unknown>;
+    };
+    stdin.write(spec.source);
+    await stdin.end();
+  } catch (err) {
+    return internalError(`d2 stdin pipe failed: ${(err as Error).message}`);
+  }
 
   // Drain both streams as whole-buffer reads — line-by-line draining
   // deadlocks on backpressure when d2 produces a large SVG.
@@ -67,6 +73,13 @@ export async function renderD2(
   }
 
   const dims = parseSvgDimensions(rewritten);
+  if (dims === null) {
+    // SVG had no parseable width/height — every diagram silently snaps to
+    // FALLBACK_SIZE. Surface so the operator knows why dimensions look off.
+    console.warn(
+      '[visualize] d2 output had no parseable dimensions; using fallback size'
+    );
+  }
   return {
     ok: true,
     bytes: new TextEncoder().encode(rewritten),

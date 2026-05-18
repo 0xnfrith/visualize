@@ -1,25 +1,28 @@
-import type { RenderKind } from '../canvas/types.ts';
+/**
+ * Payload variants the server sends per entry.
+ *
+ * `svg`: inline SVG markup. The browser injects it into the DOM so tldraw's
+ *   `.tl-theme__dark` class scopes through to the diagram's CSS — that's
+ *   how light/dark switching is free.
+ * `image`: URL to fetch rendered bytes from. Raster content can't be
+ *   cleanly inlined into JSON.
+ *
+ * Discriminated on `kind` so `payload` and the visible payload field are
+ * always in sync; the compiler enforces "exactly one of" by construction.
+ */
+export type PublicPayload =
+  | { kind: 'svg'; svgText: string }
+  | { kind: 'image'; assetUrl: string };
 
 export interface PublicEntry {
   id: string;
   title: string;
-  kind: RenderKind;
   mime: string;
   size: { width: number; height: number };
   position: { x: number; y: number };
   page: string;
   version: number;
-  /**
-   * Inline SVG markup. Present for `d2` and `svg` kinds; the browser injects
-   * it into the DOM so tldraw's `.tl-theme__dark` class scopes through to the
-   * diagram's CSS. Absent for `image` kind (use `assetUrl` instead).
-   */
-  svgText?: string;
-  /**
-   * URL to fetch rendered bytes from. Present only for `image` kind — binary
-   * raster content can't be cleanly inlined into JSON. Relative to the server.
-   */
-  assetUrl?: string;
+  payload: PublicPayload;
 }
 
 export type ServerMessage =

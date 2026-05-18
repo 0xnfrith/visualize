@@ -4,10 +4,12 @@ import {
   type SvgExportContext,
   type TLBaseShape,
 } from 'tldraw';
+import { injectRootClass } from './svg-utils.ts';
 
 // Discriminated union for what we display in the shape. SVG content is
 // inlined into the DOM so tldraw's `.tl-theme__dark` ancestor class can
-// scope to the diagram's CSS — that's how light/dark switching is free.
+// scope to the diagram's CSS — that's how light/dark switching is free,
+// and avoids a per-update network round-trip for re-fetching the asset.
 // Raster content stays behind a URL because base64-inlining it would
 // balloon the WS messages.
 export type DiagramContent =
@@ -40,6 +42,9 @@ export class DiagramShapeUtil extends BaseBoxShapeUtil<DiagramShape> {
       w: 320,
       h: 240,
       version: 0,
+      // `text: ''` is a deliberate "no payload yet" sentinel rendered as an
+      // empty placeholder by `component`. Real content arrives via the WS
+      // `diagram_upserted` message and triggers a re-render.
       content: { kind: 'svg', text: '' },
     };
   }
@@ -61,6 +66,27 @@ export class DiagramShapeUtil extends BaseBoxShapeUtil<DiagramShape> {
         </HTMLContainer>
       );
     }
+    // Empty-string sentinel: render a neutral placeholder rather than an
+    // empty host (which would silently look like a broken render).
+    if (content.text === '') {
+      return (
+        <HTMLContainer
+          id={shape.id}
+          style={{
+            width: w,
+            height: h,
+            pointerEvents: 'all',
+            display: 'grid',
+            placeItems: 'center',
+            opacity: 0.5,
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: 12,
+          }}
+        >
+          <span>diagram pending…</span>
+        </HTMLContainer>
+      );
+    }
     return (
       <HTMLContainer
         id={shape.id}
@@ -68,8 +94,11 @@ export class DiagramShapeUtil extends BaseBoxShapeUtil<DiagramShape> {
       >
         <div
           className="visualize-svg-host"
-          // The inlined SVG carries its own <style> block whose `.tl-theme__dark`
-          // -prefixed rules light up when tldraw toggles the ancestor class.
+          // SVG markup is sanitized at the WS boundary (see `sync.ts`
+          // `sanitizeSvg`) — by the time it lands in shape props, `<script>`
+          // tags and `on*` handlers have been stripped. The inlined SVG's own
+          // `<style>` block carries `.tl-theme__dark`-prefixed rules that
+          // light up when tldraw toggles the ancestor class.
           dangerouslySetInnerHTML={{ __html: content.text }}
         />
       </HTMLContainer>
@@ -86,7 +115,8 @@ export class DiagramShapeUtil extends BaseBoxShapeUtil<DiagramShape> {
     // `ctx.isDarkMode`. The CSS rules inside the diagram fire from a
     // `.tl-theme__dark` ancestor; in a standalone exported SVG there's no
     // such ancestor, so we add it to the root <svg> element itself when
-    // exporting in dark mode.
+    // exporting in dark mode. (Raster `image`-kind shapes are themed by the
+    // renderer at draw time, not by tldraw at export, so no class needed.)
     const { w, h, content } = shape.props;
     if (content.kind === 'image') {
       return (
@@ -113,20 +143,3 @@ export class DiagramShapeUtil extends BaseBoxShapeUtil<DiagramShape> {
   }
 }
 
-// Add a class to the root <svg> element. Used only for export — at canvas
-// runtime, the class lives on tldraw's container instead and cascades down.
-function injectRootClass(svgText: string, cls: string): string {
-  const open = svgText.indexOf('<svg');
-  if (open === -1) return svgText;
-  const closeAngle = svgText.indexOf('>', open);
-  if (closeAngle === -1) return svgText;
-  const opening = svgText.slice(open, closeAngle);
-  const classMatch = /\sclass=("([^"]*)"|'([^']*)')/i.exec(opening);
-  if (classMatch) {
-    const existing = classMatch[2] ?? classMatch[3] ?? '';
-    const combined = existing.includes(cls) ? existing : `${existing} ${cls}`.trim();
-    const replaced = opening.replace(classMatch[0], ` class="${combined}"`);
-    return svgText.slice(0, open) + replaced + svgText.slice(closeAngle);
-  }
-  return svgText.slice(0, open + 4) + ` class="${cls}"` + svgText.slice(open + 4);
-}
