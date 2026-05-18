@@ -18,6 +18,15 @@
         position: absolute;
         inset: 0;
       }
+      /* Inlined diagram SVGs scale to fill their tldraw shape; the viewBox
+         on the SVG handles the math. Without this the SVG's intrinsic
+         width/height attributes would lock its rendered size. */
+      .visualize-svg-host,
+      .visualize-svg-host > svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
     </style>
   </head>
   <body>

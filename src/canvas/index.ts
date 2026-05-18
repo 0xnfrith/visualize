@@ -61,13 +61,15 @@ export class CanvasIndex {
 
     // Create. Assign id if absent. Auto-place via grid cursor if no position
     // supplied. Log if a caller passed an id we didn't recognize — that's a
-    // contract surprise worth surfacing.
-    const id = input.id ?? this.allocateId(input.spec.kind);
-    if (input.id && input.id !== id) {
-      console.error(
-        `[visualize] draw() called with id=${input.id} which does not exist; creating new`
+    // contract surprise worth surfacing. (The previous `input.id !== id`
+    // check was unreachable because `id` is derived from `input.id ?? ...`;
+    // compare against the entry map directly instead.)
+    if (input.id !== undefined && !this.entries.has(input.id)) {
+      console.warn(
+        `[visualize] draw() called with id=${input.id} which doesn't exist; creating new`
       );
     }
+    const id = input.id ?? this.allocateId(input.spec.kind);
     const position = input.position ?? this.nextGridSlot(intrinsicSize);
     const entry: Entry = {
       id,
@@ -173,7 +175,10 @@ export class CanvasIndex {
     try {
       ws.send(JSON.stringify(msg));
     } catch (err) {
-      console.error('[visualize] ws send failed:', err);
+      // The socket is dead — keeping it in the set means every future
+      // broadcast logs the same error. Drop it so we stop spamming.
+      console.error('[visualize] ws send failed, removing browser:', err);
+      this.browsers.delete(ws);
     }
   }
 
@@ -183,15 +188,21 @@ export class CanvasIndex {
 }
 
 function toPublic(entry: Entry): import('../mcp/protocol.ts').PublicEntry {
+  // SVG-shaped content (d2 + raw svg) is inlined into the WS message so the
+  // browser can drop the markup into the DOM, where tldraw's theme class
+  // scopes through. Raster image content stays behind a URL.
+  const payload: import('../mcp/protocol.ts').PublicPayload =
+    entry.spec.kind === 'd2' || entry.spec.kind === 'svg'
+      ? { kind: 'svg', svgText: new TextDecoder().decode(entry.bytes) }
+      : { kind: 'image', assetUrl: `/diagrams/${encodeURIComponent(entry.id)}` };
   return {
     id: entry.id,
     title: entry.title,
-    kind: entry.spec.kind,
     mime: entry.mime,
     size: entry.size,
     position: entry.position,
     page: entry.page,
     version: entry.version,
-    assetUrl: `/diagrams/${encodeURIComponent(entry.id)}`,
+    payload,
   };
 }

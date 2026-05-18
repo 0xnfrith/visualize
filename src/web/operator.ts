@@ -1,13 +1,15 @@
 import type { Editor, TLShape } from 'tldraw';
 import type { BrowserMessage } from '../../src/mcp/protocol.ts';
-import { fromShapeId } from './sync.ts';
+import { fromShapeId, type SocketHandle } from './sync.ts';
 
 const POSITION_DEBOUNCE_MS = 250;
 const SELECTION_DEBOUNCE_MS = 150;
 
-export function attachOperatorListeners(editor: Editor, socket: WebSocket): () => void {
+export function attachOperatorListeners(
+  editor: Editor,
+  socket: SocketHandle
+): () => void {
   const send = (msg: BrowserMessage) => {
-    if (socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify(msg));
   };
 

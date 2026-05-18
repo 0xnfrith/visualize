@@ -8,7 +8,9 @@
   "scripts": {
     "start": "bun install --no-summary && bun run scripts/build-web.ts && bun server.ts",
     "build:web": "bun run scripts/build-web.ts",
-    "dev:web": "bun --hot run scripts/build-web.ts --watch"
+    "dev:web": "bun --hot run scripts/build-web.ts --watch",
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
