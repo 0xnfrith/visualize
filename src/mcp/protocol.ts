@@ -9,8 +9,17 @@ export interface PublicEntry {
   position: { x: number; y: number };
   page: string;
   version: number;
-  /** Browser fetches the rendered bytes from this URL (relative to the server). */
-  assetUrl: string;
+  /**
+   * Inline SVG markup. Present for `d2` and `svg` kinds; the browser injects
+   * it into the DOM so tldraw's `.tl-theme__dark` class scopes through to the
+   * diagram's CSS. Absent for `image` kind (use `assetUrl` instead).
+   */
+  svgText?: string;
+  /**
+   * URL to fetch rendered bytes from. Present only for `image` kind — binary
+   * raster content can't be cleanly inlined into JSON. Relative to the server.
+   */
+  assetUrl?: string;
 }
 
 export type ServerMessage =

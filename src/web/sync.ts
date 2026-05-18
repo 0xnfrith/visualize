@@ -1,12 +1,10 @@
 import {
-  AssetRecordType,
   createShapeId,
   type Editor,
-  type TLAssetId,
-  type TLImageShape,
   type TLShapeId,
 } from 'tldraw';
 import type { PublicEntry, ServerMessage } from '../../src/mcp/protocol.ts';
+import type { DiagramContent, DiagramShape } from './diagram-shape.tsx';
 
 const SHAPE_PREFIX = 'diagram-';
 
@@ -64,62 +62,40 @@ function replaceAll(editor: Editor, entries: PublicEntry[]): void {
 
 function upsertOne(editor: Editor, entry: PublicEntry): void {
   const shapeId = toShapeId(entry.id);
-  const assetId = toAssetId(entry.id);
-  const versionedSrc = `${entry.assetUrl}?v=${entry.version}`;
+  const content = entryToContent(entry);
+  const props = {
+    w: entry.size.width,
+    h: entry.size.height,
+    version: entry.version,
+    content,
+  };
 
   if (editor.getShape(shapeId)) {
-    // Existing — replace the asset's src so the browser refetches the new
-    // bytes, then nudge the shape's w/h if the new render changed size.
-    editor.updateAssets([
-      {
-        id: assetId,
-        type: 'image',
-        typeName: 'asset',
-        props: {
-          name: entry.title,
-          src: versionedSrc,
-          w: entry.size.width,
-          h: entry.size.height,
-          mimeType: entry.mime,
-          isAnimated: false,
-        },
-        meta: {},
-      } as never,
-    ]);
-    editor.updateShape({
+    editor.updateShape<DiagramShape>({
       id: shapeId,
-      type: 'image',
+      type: 'diagram',
       x: entry.position.x,
       y: entry.position.y,
-      props: { w: entry.size.width, h: entry.size.height, assetId },
+      props,
     });
     return;
   }
 
-  // New shape — create asset first, then the shape that references it.
-  editor.createAssets([
-    {
-      id: assetId,
-      type: 'image',
-      typeName: 'asset',
-      props: {
-        name: entry.title,
-        src: versionedSrc,
-        w: entry.size.width,
-        h: entry.size.height,
-        mimeType: entry.mime,
-        isAnimated: false,
-      },
-      meta: {},
-    } as never,
-  ]);
-  editor.createShape<TLImageShape>({
+  editor.createShape<DiagramShape>({
     id: shapeId,
-    type: 'image',
+    type: 'diagram',
     x: entry.position.x,
     y: entry.position.y,
-    props: { w: entry.size.width, h: entry.size.height, assetId },
+    props,
   });
+}
+
+function entryToContent(entry: PublicEntry): DiagramContent {
+  if (entry.svgText != null) {
+    return { kind: 'svg', text: entry.svgText };
+  }
+  // Image kind: server didn't inline SVG, fall back to URL fetch.
+  return { kind: 'image', url: entry.assetUrl ?? '' };
 }
 
 function removeOne(editor: Editor, id: string): void {
@@ -140,10 +116,6 @@ function focusOne(editor: Editor, id: string, padding?: number, duration?: numbe
 
 export function toShapeId(diagramId: string): TLShapeId {
   return createShapeId(`${SHAPE_PREFIX}${diagramId}`);
-}
-
-export function toAssetId(diagramId: string): TLAssetId {
-  return AssetRecordType.createId(`${SHAPE_PREFIX}${diagramId}`);
 }
 
 export function fromShapeId(shapeId: TLShapeId): string | null {

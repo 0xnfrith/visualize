@@ -183,7 +183,7 @@ export class CanvasIndex {
 }
 
 function toPublic(entry: Entry): import('../mcp/protocol.ts').PublicEntry {
-  return {
+  const base = {
     id: entry.id,
     title: entry.title,
     kind: entry.spec.kind,
@@ -192,6 +192,12 @@ function toPublic(entry: Entry): import('../mcp/protocol.ts').PublicEntry {
     position: entry.position,
     page: entry.page,
     version: entry.version,
-    assetUrl: `/diagrams/${encodeURIComponent(entry.id)}`,
   };
+  // SVG-shaped content (d2 + raw svg) is inlined into the WS message so the
+  // browser can drop the markup into the DOM, where tldraw's theme class
+  // scopes through. Raster image content stays behind a URL.
+  if (entry.spec.kind === 'd2' || entry.spec.kind === 'svg') {
+    return { ...base, svgText: new TextDecoder().decode(entry.bytes) };
+  }
+  return { ...base, assetUrl: `/diagrams/${encodeURIComponent(entry.id)}` };
 }
