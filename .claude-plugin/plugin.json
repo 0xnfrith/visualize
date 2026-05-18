@@ -1,0 +1,14 @@
+{
+  "name": "visualize",
+  "version": "0.1.0",
+  "description": "Diagram-rendering canvas. Claude draws via D2 / raw SVG / image URLs; operator riffs on a tldraw surface.",
+  "author": {
+    "name": "Nicholas Frith"
+  },
+  "repository": "https://github.com/nfrith/visualize",
+  "license": "Apache-2.0",
+  "keywords": ["canvas", "d2", "tldraw", "mcp", "diagrams"],
+  "channels": [
+    { "server": "visualize" }
+  ]
+}
