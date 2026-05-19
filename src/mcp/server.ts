@@ -24,10 +24,12 @@ export interface ServerHandle {
  * process's stdout, so any stray console.log corrupts JSON-RPC frames.
  *
  * Bind interface and advertised hostname are configurable via the plugin's
- * userConfig (exported by Claude Code as CLAUDE_PLUGIN_OPTION_BIND_HOST /
- * CLAUDE_PLUGIN_OPTION_ADVERTISED_HOST). Defaults keep host-machine behavior
- * loopback-only; containers override to bind 0.0.0.0 and advertise their
- * host-reachable name.
+ * userConfig, bridged into VISUALIZE_BIND_HOST / VISUALIZE_ADVERTISED_HOST
+ * by .mcp.json's env block (Claude Code's ${user_config.*} substitution).
+ * The auto-export-as-CLAUDE_PLUGIN_OPTION_* path the docs describe doesn't
+ * fire for MCP-server subprocesses on 2.1.144, so we wire it explicitly.
+ * Defaults keep host-machine behavior loopback-only; containers override to
+ * bind 0.0.0.0 and advertise their host-reachable name.
  */
 export function startServer(canvas: CanvasIndex): ServerHandle {
   const { bindHost, advertisedHost } = resolveHosts();
@@ -108,8 +110,8 @@ export function resolveHosts(env: NodeJS.ProcessEnv = process.env): {
   bindHost: string;
   advertisedHost: string;
 } {
-  const bindHost = env.CLAUDE_PLUGIN_OPTION_BIND_HOST?.trim() || '127.0.0.1';
-  const advertisedRaw = env.CLAUDE_PLUGIN_OPTION_ADVERTISED_HOST?.trim();
+  const bindHost = env.VISUALIZE_BIND_HOST?.trim() || '127.0.0.1';
+  const advertisedRaw = env.VISUALIZE_ADVERTISED_HOST?.trim();
   // 0.0.0.0 isn't a dialable URL. Remap to loopback in both the fallback path
   // (advertised unset, bind is 0.0.0.0) and the explicit-misconfig path
   // (advertised set to 0.0.0.0), so the operator can't end up with a broken

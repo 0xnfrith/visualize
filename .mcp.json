@@ -1,7 +1,11 @@
 {
   "mcpServers": {
     "visualize": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/bin/visualize-server"
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/visualize-server",
+      "env": {
+        "VISUALIZE_BIND_HOST": "${user_config.bind_host}",
+        "VISUALIZE_ADVERTISED_HOST": "${user_config.advertised_host}"
+      }
     }
   }
 }

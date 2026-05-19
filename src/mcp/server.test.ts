@@ -6,8 +6,8 @@ const env = (
   advertised?: string
 ): NodeJS.ProcessEnv => {
   const e: NodeJS.ProcessEnv = {};
-  if (bind !== undefined) e.CLAUDE_PLUGIN_OPTION_BIND_HOST = bind;
-  if (advertised !== undefined) e.CLAUDE_PLUGIN_OPTION_ADVERTISED_HOST = advertised;
+  if (bind !== undefined) e.VISUALIZE_BIND_HOST = bind;
+  if (advertised !== undefined) e.VISUALIZE_ADVERTISED_HOST = advertised;
   return e;
 };
 
