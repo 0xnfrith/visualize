@@ -1,4 +1,4 @@
-import type { Editor, TLShape } from 'tldraw';
+import { react, type Editor, type TLShape } from 'tldraw';
 import type { BrowserMessage } from '../../src/mcp/protocol.ts';
 import { fromShapeId, type SocketHandle } from './sync.ts';
 
@@ -12,6 +12,36 @@ export function attachOperatorListeners(
   const send = (msg: BrowserMessage) => {
     socket.send(JSON.stringify(msg));
   };
+
+  // Theme reporting. The server keeps a snapshot of the operator's current
+  // canvas theme so MCP tools can hand it to the agent; the agent picks
+  // diagram colors that contrast with it. tldraw's `colorScheme` user pref
+  // can be `'light' | 'dark' | 'system'`; resolve `'system'` via
+  // `matchMedia` and re-resolve when the OS preference flips. We also
+  // re-send on every (re)connect so the server's pre-handshake default never
+  // sticks.
+  const osDark = window.matchMedia('(prefers-color-scheme: dark)');
+  let lastReported: 'light' | 'dark' | null = null;
+  const resolveTheme = (): 'light' | 'dark' => {
+    const pref = editor.user.getUserPreferences().colorScheme;
+    if (pref === 'dark') return 'dark';
+    if (pref === 'light') return 'light';
+    return osDark.matches ? 'dark' : 'light';
+  };
+  const sendTheme = (force: boolean) => {
+    const theme = resolveTheme();
+    if (!force && theme === lastReported) return;
+    lastReported = theme;
+    send({ type: 'browser.theme_changed', theme });
+  };
+  const unsubTheme = react('visualize.theme-report', () => sendTheme(false));
+  const onOsThemeChange = () => sendTheme(false);
+  osDark.addEventListener('change', onOsThemeChange);
+  // Re-send on every socket open so a reconnect re-syncs the server's
+  // snapshot — the initial reactive run above happens before the socket has
+  // finished its handshake, so its message is swallowed by `socket.send`'s
+  // closed-socket guard.
+  const unsubOpen = socket.onOpen(() => sendTheme(true));
 
   // Position changes — debounce per shape so a mid-drag burst collapses to
   // one event with the final coords. Server already coalesces at 500ms, but
@@ -80,6 +110,9 @@ export function attachOperatorListeners(
   return () => {
     unsubStore();
     unsubSession();
+    unsubTheme();
+    unsubOpen();
+    osDark.removeEventListener('change', onOsThemeChange);
     for (const t of pendingMoves.values()) clearTimeout(t);
     if (selectionTimer) clearTimeout(selectionTimer);
   };

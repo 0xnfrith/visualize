@@ -145,6 +145,9 @@ function handleMessage(
     case 'browser.selection_changed':
       canvas.setActiveSelection(msg.ids);
       return;
+    case 'browser.theme_changed':
+      canvas.setTheme(msg.theme);
+      return;
   }
 }
 

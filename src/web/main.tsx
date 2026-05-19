@@ -14,9 +14,9 @@ function App() {
     // `prefers-color-scheme` for new visitors, who may prefer light. They
     // can switch via Preferences -> Color scheme, which tldraw persists to
     // localStorage; on subsequent visits the persisted value (`'light'`,
-    // `'dark'`, or `'system'`) is respected. Tldraw is canonical for theme
-    // from here on — toggling repaints every inlined diagram via the
-    // `.tl-theme__dark` ancestor class.
+    // `'dark'`, or `'system'`) is respected. tldraw is canonical for theme;
+    // `operator.ts` reports it back to the server so the agent can pick
+    // contrasting diagram colors at draw time.
     if (editor.user.getUserPreferences().colorScheme == null) {
       editor.user.updateUserPreferences({ colorScheme: 'dark' });
     }

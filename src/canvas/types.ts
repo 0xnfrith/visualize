@@ -1,8 +1,7 @@
 export type RenderKind = 'd2' | 'svg' | 'image';
-export type D2Layout = 'dagre' | 'elk' | 'tala';
 
 export type RenderSpec =
-  | { kind: 'd2'; source: string; layout?: D2Layout }
+  | { kind: 'd2'; source: string }
   | { kind: 'svg'; source: string }
   | { kind: 'image'; url: string; mime: 'image/png' | 'image/jpeg' };
 

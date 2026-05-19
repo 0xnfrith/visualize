@@ -9,22 +9,21 @@ export interface ToolDescriptor {
   handler: (args: any) => Promise<unknown>;
 }
 
-const D2_LAYOUTS = ['dagre', 'elk', 'tala'] as const;
-
 export function buildTools(
   canvas: CanvasIndex,
   boardUrl: string,
   sessionId: string,
-  port: number
+  port: number,
+  getTheme: () => 'light' | 'dark'
 ): ToolDescriptor[] {
   return [
     {
       name: 'get_board_url',
       description:
-        'Return the URL of the visual canvas for this session. Useful at session start, or whenever the operator asks where the board is.',
+        "Return the URL of the visual canvas for this session plus the operator's current canvas theme (`light` | `dark`). Useful at session start, or whenever the operator asks where the board is. Use the returned `theme` to inform your D2 `vars.d2-config.theme-id` choice so the diagram contrasts with the canvas background.",
       inputSchema: { type: 'object', properties: {} },
       async handler() {
-        return { url: boardUrl, session_id: sessionId, port };
+        return { url: boardUrl, session_id: sessionId, port, theme: getTheme() };
       },
     },
 
@@ -32,8 +31,8 @@ export function buildTools(
       name: 'draw',
       description:
         'Create or replace a diagram on the canvas. Provide `id` to replace an existing diagram (preserves position & size); omit for a new one (auto-placed on a grid). Pick `spec.kind` based on what you want to render:\n' +
-        '- `d2` — the default and best choice for most diagrams. Flow, topology, C4 with nested containers (`{ ... }`), sequence (`shape: sequence_diagram`), ER (`shape: sql_table` + column-level FK arrows), UML class (`shape: class`). Pass optional `layout` (`dagre` for clean acyclic flows; `elk` for graphs with cycles, feedback edges, or dense relationships; `tala` for the premium engine if installed).\n' +
-        '- `svg` — paste raw SVG markup for diagrams you generate yourself or pull from elsewhere.\n' +
+        '- `d2` — the default and best choice for most diagrams. Flow, topology, C4 with nested containers (`{ ... }`), sequence (`shape: sequence_diagram`), ER (`shape: sql_table` + column-level FK arrows), UML class (`shape: class`). Configure theme, layout engine, and palette overrides INSIDE the D2 source via `vars: { d2-config: { theme-id: ..., layout-engine: ..., theme-overrides: { ... } } }` — there are no separate params on this tool. Read the operator\'s canvas theme from `get_board_url` and pick a `theme-id` that contrasts with it.\n' +
+        '- `svg` — paste raw SVG markup for diagrams you generate yourself or pull from elsewhere. Pick colors that contrast with the canvas theme from `get_board_url`.\n' +
         '- `image` — fetch a PNG/JPEG by https URL.\n\n' +
         'Validation errors come back as `{ ok: false, error: { messages: [{ line, column, text }] } }` — fix the source and call draw again. The render bytes are never returned to you (they go straight to the browser); you get back the id, position, size, and byte count.',
       inputSchema: {
@@ -56,11 +55,10 @@ export function buildTools(
                 required: ['kind', 'source'],
                 properties: {
                   kind: { const: 'd2' },
-                  source: { type: 'string', description: 'D2 source code.' },
-                  layout: {
-                    enum: D2_LAYOUTS,
+                  source: {
+                    type: 'string',
                     description:
-                      'D2 layout engine. `dagre` (default) for clean acyclic flows; `elk` for cycles / feedback edges; `tala` if installed.',
+                      'D2 source code. Embed `vars: { d2-config: { theme-id, layout-engine, theme-overrides } }` at the top to control rendering.',
                   },
                 },
               },
@@ -162,7 +160,7 @@ export function buildTools(
     {
       name: 'get_canvas',
       description:
-        'List every diagram currently on the canvas — id, title, kind, position, size, page, version. Does NOT return the rendered bytes (the browser fetches those directly); use this to enumerate what is on the board. Also returns the operator\'s active selection.',
+        "List every diagram currently on the canvas — id, title, kind, position, size, page, version. Does NOT return the rendered bytes (the browser fetches those directly); use this to enumerate what is on the board. Also returns the operator's active selection and current canvas theme (`light` | `dark`).",
       inputSchema: { type: 'object', properties: {} },
       async handler() {
         const entries = canvas.list().map(e => ({
@@ -181,6 +179,7 @@ export function buildTools(
         return {
           entries,
           activeSelection: selected ? selected.id : null,
+          theme: getTheme(),
         };
       },
     },
@@ -188,11 +187,11 @@ export function buildTools(
     {
       name: 'get_active_selection',
       description:
-        'Return the diagram the operator currently has selected on the canvas — id, title, full spec (including the original source the operator is pointing at), position, size. Returns null if nothing is selected. Use this when the operator asks you to refine or update "this" diagram; the returned source is what you should base your update on.',
+        'Return the diagram the operator currently has selected on the canvas — id, title, full spec (including the original source the operator is pointing at), position, size. Returns null if nothing is selected. Use this when the operator asks you to refine or update "this" diagram; the returned source is what you should base your update on. Also returns the operator\'s current canvas theme (`light` | `dark`) so a refinement can re-pick `theme-id` if the canvas has changed.',
       inputSchema: { type: 'object', properties: {} },
       async handler() {
         const entry = canvas.getActiveSelection();
-        if (!entry) return { selected: null };
+        if (!entry) return { selected: null, theme: getTheme() };
         return {
           selected: {
             id: entry.id,
@@ -203,6 +202,7 @@ export function buildTools(
             page: entry.page,
             version: entry.version,
           },
+          theme: getTheme(),
         };
       },
     },

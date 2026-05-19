@@ -39,7 +39,9 @@ async function main() {
   const channel = new ChannelEmitter(server);
   canvas.setChannel(channel);
 
-  const tools = buildTools(canvas, handle.url, sessionId, handle.port);
+  const tools = buildTools(canvas, handle.url, sessionId, handle.port, () =>
+    canvas.getTheme()
+  );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map(t => ({

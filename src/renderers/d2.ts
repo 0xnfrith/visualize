@@ -1,26 +1,17 @@
 import type { RenderSpec, Size } from '../canvas/types.ts';
 import type { RenderResult, ValidationError } from './registry.ts';
-import { D2RewriteError, rewriteD2DarkMode } from './d2-css-rewrite.ts';
 import { parseSvgDimensions } from './svg.ts';
 
 const D2_ERR_LINE = /^err:\s*(?:\S+:\s*)?(\d+):(\d+):\s*(.+)$/;
 
-// Theme IDs paired so D2 emits both palettes in one SVG; the dark palette
-// lands inside `@media (prefers-color-scheme:dark)` which we rewrite at
-// ingest to fire from tldraw's `.tl-theme__dark` class instead.
-const D2_LIGHT_THEME = '0';
-const D2_DARK_THEME = '200';
-
+// Renderer is a thin pass-through. Theme, layout, and any palette overrides
+// belong in the D2 source itself via `vars.d2-config` (`theme-id`,
+// `layout-engine`, `theme-overrides`, ...). The agent reads the operator's
+// canvas theme from `get_board_url` and authors a single-theme program.
 export async function renderD2(
   spec: Extract<RenderSpec, { kind: 'd2' }>
 ): Promise<RenderResult> {
-  const args = [
-    '--stdout-format', 'svg',
-    '--theme', D2_LIGHT_THEME,
-    '--dark-theme', D2_DARK_THEME,
-  ];
-  if (spec.layout) args.push('--layout', spec.layout);
-  args.push('-', '-');
+  const args = ['--stdout-format', 'svg', '-', '-'];
 
   let proc;
   try {
@@ -62,17 +53,7 @@ export async function renderD2(
     return { ok: false, error: parseD2Errors(stderr) };
   }
 
-  let rewritten: string;
-  try {
-    rewritten = rewriteD2DarkMode(stdout);
-  } catch (err) {
-    if (err instanceof D2RewriteError) {
-      return internalError(err.message);
-    }
-    throw err;
-  }
-
-  const dims = parseSvgDimensions(rewritten);
+  const dims = parseSvgDimensions(stdout);
   if (dims === null) {
     // SVG had no parseable width/height — every diagram silently snaps to
     // FALLBACK_SIZE. Surface so the operator knows why dimensions look off.
@@ -82,7 +63,7 @@ export async function renderD2(
   }
   return {
     ok: true,
-    bytes: new TextEncoder().encode(rewritten),
+    bytes: new TextEncoder().encode(stdout),
     mime: 'image/svg+xml',
     size: dims ?? FALLBACK_SIZE,
   };

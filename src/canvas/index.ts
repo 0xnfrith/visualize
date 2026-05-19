@@ -20,6 +20,10 @@ export class CanvasIndex {
   private readonly entries = new Map<string, Entry>();
   private readonly browsers = new Set<BrowserSocket>();
   private activeSelection: string | null = null;
+  // Defaults to `dark` to match `src/web/main.tsx`'s first-visit forced
+  // default. The browser pushes its actual preference on every connect, so
+  // this is only the pre-handshake guess.
+  private currentTheme: 'light' | 'dark' = 'dark';
   private placementCol = 0;
   private placementRow = 0;
   private idCounter = 0;
@@ -27,6 +31,14 @@ export class CanvasIndex {
 
   setChannel(channel: ChannelEmitter): void {
     this.channel = channel;
+  }
+
+  getTheme(): 'light' | 'dark' {
+    return this.currentTheme;
+  }
+
+  setTheme(theme: 'light' | 'dark'): void {
+    this.currentTheme = theme;
   }
 
   upsert(
@@ -189,8 +201,8 @@ export class CanvasIndex {
 
 function toPublic(entry: Entry): import('../mcp/protocol.ts').PublicEntry {
   // SVG-shaped content (d2 + raw svg) is inlined into the WS message so the
-  // browser can drop the markup into the DOM, where tldraw's theme class
-  // scopes through. Raster image content stays behind a URL.
+  // browser can drop the markup into the DOM. Raster image content stays
+  // behind a URL.
   const payload: import('../mcp/protocol.ts').PublicPayload =
     entry.spec.kind === 'd2' || entry.spec.kind === 'svg'
       ? { kind: 'svg', svgText: new TextDecoder().decode(entry.bytes) }

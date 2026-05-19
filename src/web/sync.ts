@@ -18,6 +18,13 @@ export interface SocketHandle {
   close: () => void;
   /** Send to the current socket; no-op when disconnected. */
   send: (msg: string) => void;
+  /**
+   * Register a callback that fires every time the underlying socket opens —
+   * once on initial connect and again after each reconnect. Use this to
+   * re-send any session-scoped state (e.g. current theme) that the server
+   * needs to learn fresh on every connection. Returns an unsubscribe fn.
+   */
+  onOpen: (cb: () => void) => () => void;
 }
 
 /**
@@ -30,6 +37,7 @@ export function connectSocket(editor: Editor): SocketHandle {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let stopped = false;
   let attempt = 0;
+  const openListeners = new Set<() => void>();
 
   const open = () => {
     if (stopped) return;
@@ -43,6 +51,13 @@ export function connectSocket(editor: Editor): SocketHandle {
       // drops shouldn't permanently climb to the 8s cap.
       attempt = 0;
       socket.send(JSON.stringify({ type: 'browser.subscribe' }));
+      for (const cb of openListeners) {
+        try {
+          cb();
+        } catch (err) {
+          console.error('[visualize] onOpen callback failed:', err);
+        }
+      }
     });
 
     socket.addEventListener('message', ev => {
@@ -88,6 +103,10 @@ export function connectSocket(editor: Editor): SocketHandle {
     },
     send: (msg: string) => {
       if (current?.readyState === WebSocket.OPEN) current.send(msg);
+    },
+    onOpen: (cb: () => void) => {
+      openListeners.add(cb);
+      return () => openListeners.delete(cb);
     },
   };
 }
