@@ -12,7 +12,7 @@ Mermaid (state diagrams) is intentionally **not** in v0. The in-process path req
 
 ## Prerequisites
 
-Both **[bun](https://bun.sh)** and **[d2](https://d2lang.com)** must be on `PATH` before the plugin can start.
+**[bun](https://bun.sh)** must be on `PATH` for the MCP server to spawn. **[d2](https://d2lang.com)** is needed at render time — install both up-front.
 
 **macOS:**
 
@@ -29,7 +29,7 @@ curl -fsSL https://d2lang.com/install.sh | sh -s --
 
 Release tarballs if curl-installers don't fit: [bun releases](https://github.com/oven-sh/bun/releases), [d2 releases](https://github.com/terrastruct/d2/releases).
 
-The plugin preflights both binaries before the MCP server is spawned (see `bin/visualize-server`) and prints a structured failure to the `/plugin` Errors tab if anything is missing. The same `d2` check also runs inside `server.ts` as a defensive inner guard.
+If `d2` is missing the server still boots — the first `draw` call surfaces install instructions through Claude as a normal tool error, so no Claude Code restart is needed once you install `d2`. If `bun` is missing the MCP server can't spawn at all, which surfaces as `× failed` in `/plugin Installed` (run `claude --debug mcp` to see the underlying ENOENT).
 
 ## Install
 
@@ -46,7 +46,7 @@ Or from the marketplace once published.
 ```
 .claude-plugin/plugin.json   plugin manifest
 .mcp.json                    MCP server entry pointing at server.ts
-server.ts                    MCP stdio entry, d2 detection, channel wiring
+server.ts                    MCP stdio entry, channel wiring
 src/canvas/                  CanvasIndex — in-memory store of rendered diagrams
 src/renderers/               d2 (CLI shell-out), svg, image, registry
 src/mcp/                     Bun.serve HTTP+WS, tools, channel emitter, protocol

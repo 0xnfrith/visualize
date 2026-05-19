@@ -16,8 +16,6 @@ import { buildTools } from './src/mcp/tools.ts';
 const PKG_VERSION = await readPackageVersion();
 
 async function main() {
-  await assertD2Installed();
-
   const cwd = process.cwd();
   const sessionId = `${basename(cwd) || 'session'}-${Date.now().toString(36)}`;
 
@@ -91,25 +89,6 @@ async function readPackageVersion(): Promise<string> {
   const url = new URL('./package.json', import.meta.url);
   const pkg = JSON.parse(await Bun.file(url).text()) as { version?: string };
   return pkg.version ?? '0.0.0';
-}
-
-async function assertD2Installed(): Promise<void> {
-  const proc = Bun.spawn(['d2', '--version'], {
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  try {
-    const exit = await proc.exited;
-    if (exit !== 0) throw new Error(`d2 exited ${exit}`);
-  } catch (err) {
-    console.error(
-      '[visualize] d2 binary not found on PATH.\n' +
-        '  Install: brew install d2\n' +
-        '  See: https://d2lang.com/tour/install\n' +
-        `  Underlying error: ${(err as Error).message}`
-    );
-    process.exit(1);
-  }
 }
 
 main().catch(err => {

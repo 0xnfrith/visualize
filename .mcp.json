@@ -1,7 +1,8 @@
 {
   "mcpServers": {
     "visualize": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/bin/visualize-server",
+      "command": "bun",
+      "args": ["run", "--cwd", "${CLAUDE_PLUGIN_ROOT}", "--silent", "start"],
       "env": {
         "VISUALIZE_BIND_HOST": "${user_config.bind_host}",
         "VISUALIZE_ADVERTISED_HOST": "${user_config.advertised_host}"

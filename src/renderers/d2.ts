@@ -22,6 +22,16 @@ export async function renderD2(
       stderr: 'pipe',
     });
   } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return internalError(
+        'd2 CLI not found on PATH — required to render D2 diagrams.\n\n' +
+          'Install:\n' +
+          '  macOS:   brew install d2\n' +
+          '  Linux:   curl -fsSL https://d2lang.com/install.sh | sh -s --\n' +
+          '  Other:   https://github.com/terrastruct/d2/releases\n\n' +
+          'Retry once installed — no session restart needed (d2 is spawned per render).'
+      );
+    }
     return internalError(`failed to spawn d2: ${(err as Error).message}`);
   }
 
