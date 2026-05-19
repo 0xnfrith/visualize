@@ -21,7 +21,7 @@ async function main() {
   const handle = startServer(canvas);
 
   const server = new Server(
-    { name: 'visualize', version: '0.1.0' },
+    { name: 'visualize', version: '0.3.0' },
     {
       capabilities: {
         tools: {},

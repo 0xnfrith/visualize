@@ -1,6 +1,6 @@
 {
   "name": "visualize",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Diagram-rendering canvas. Claude draws via D2 / raw SVG / image URLs; operator riffs on a tldraw surface. Requires `bun` and `d2` on PATH.",
   "author": {
     "name": "Nicholas Frith"

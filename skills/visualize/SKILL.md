@@ -9,7 +9,7 @@ description: >-
   that one in place instead of creating a new one.
 disable-model-invocation: true
 user-invocable: true
-version: 0.1.0
+version: 0.3.0
 ---
 
 # /visualize — paint a diagram on the canvas
