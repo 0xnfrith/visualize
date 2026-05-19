@@ -22,10 +22,18 @@ export interface ServerHandle {
  * Binds to port 0 so multiple sessions coexist without port contention. All
  * diagnostic output goes to stderr — the MCP stdio transport shares this
  * process's stdout, so any stray console.log corrupts JSON-RPC frames.
+ *
+ * Bind interface and advertised hostname are configurable via the plugin's
+ * userConfig (exported by Claude Code as CLAUDE_PLUGIN_OPTION_BIND_HOST /
+ * CLAUDE_PLUGIN_OPTION_ADVERTISED_HOST). Defaults keep host-machine behavior
+ * loopback-only; containers override to bind 0.0.0.0 and advertise their
+ * host-reachable name.
  */
 export function startServer(canvas: CanvasIndex): ServerHandle {
+  const { bindHost, advertisedHost } = resolveHosts();
+
   const server = Bun.serve<unknown>({
-    hostname: '127.0.0.1',
+    hostname: bindHost,
     port: 0,
     fetch(req, srv) {
       const url = new URL(req.url);
@@ -80,14 +88,41 @@ export function startServer(canvas: CanvasIndex): ServerHandle {
   // server.port is typed as optional (Bun.serve also supports unix sockets
   // where it's absent); with hostname + port:0 we always have a TCP port.
   const port = server.port!;
-  const url = `http://127.0.0.1:${port}`;
-  console.error(`[visualize] listening on ${url}`);
+  const url = `http://${advertisedHost}:${port}`;
+  if (bindHost === advertisedHost) {
+    console.error(`[visualize] listening on ${url}`);
+  } else {
+    console.error(
+      `[visualize] listening on ${bindHost}:${port}, advertising ${url}`
+    );
+  }
 
   return {
     url,
     port,
     stop: () => server.stop(true),
   };
+}
+
+export function resolveHosts(env: NodeJS.ProcessEnv = process.env): {
+  bindHost: string;
+  advertisedHost: string;
+} {
+  const bindHost = env.CLAUDE_PLUGIN_OPTION_BIND_HOST?.trim() || '127.0.0.1';
+  const advertisedRaw = env.CLAUDE_PLUGIN_OPTION_ADVERTISED_HOST?.trim();
+  // 0.0.0.0 isn't a dialable URL. Remap to loopback in both the fallback path
+  // (advertised unset, bind is 0.0.0.0) and the explicit-misconfig path
+  // (advertised set to 0.0.0.0), so the operator can't end up with a broken
+  // link handed to the model. Stderr-warn on the explicit case so the
+  // operator notices the override.
+  const candidate = advertisedRaw || bindHost;
+  const advertisedHost = candidate === '0.0.0.0' ? '127.0.0.1' : candidate;
+  if (advertisedRaw === '0.0.0.0') {
+    console.error(
+      "[visualize] advertised_host='0.0.0.0' isn't dialable; using 127.0.0.1 instead"
+    );
+  }
+  return { bindHost, advertisedHost };
 }
 
 function handleMessage(

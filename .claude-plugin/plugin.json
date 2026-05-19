@@ -1,6 +1,6 @@
 {
   "name": "visualize",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Diagram-rendering canvas. Claude draws via D2 / raw SVG / image URLs; operator riffs on a tldraw surface. Requires `bun` and `d2` on PATH.",
   "author": {
     "name": "Nicholas Frith"
@@ -10,5 +10,19 @@
   "keywords": ["canvas", "d2", "tldraw", "mcp", "diagrams"],
   "channels": [
     { "server": "visualize" }
-  ]
+  ],
+  "userConfig": {
+    "bind_host": {
+      "type": "string",
+      "title": "Bind host",
+      "description": "Interface the canvas HTTP server binds to. Default 127.0.0.1 (loopback only). Set to 0.0.0.0 in container environments so the host machine can reach the server.",
+      "default": "127.0.0.1"
+    },
+    "advertised_host": {
+      "type": "string",
+      "title": "Advertised host",
+      "description": "Hostname used in the URL given to Claude and shown to the operator. Defaults to the bind host (except 0.0.0.0, which falls back to 127.0.0.1). In containers, set to the host-reachable name (e.g. visualize.orb.local).",
+      "default": ""
+    }
+  }
 }
