@@ -7,9 +7,17 @@
   },
   "repository": "https://github.com/nfrith/visualize",
   "license": "Apache-2.0",
-  "keywords": ["canvas", "d2", "tldraw", "mcp", "diagrams"],
+  "keywords": [
+    "canvas",
+    "d2",
+    "tldraw",
+    "mcp",
+    "diagrams"
+  ],
   "channels": [
-    { "server": "visualize" }
+    {
+      "server": "visualize"
+    }
   ],
   "userConfig": {
     "bind_host": {

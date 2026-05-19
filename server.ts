@@ -11,6 +11,10 @@ import { ChannelEmitter } from './src/mcp/channel.ts';
 import { startServer } from './src/mcp/server.ts';
 import { buildTools } from './src/mcp/tools.ts';
 
+// Read version from package.json so we only have to bump it in one place
+// (`bun run bump <new-version>` keeps `.claude-plugin/plugin.json` in sync).
+const PKG_VERSION = await readPackageVersion();
+
 async function main() {
   await assertD2Installed();
 
@@ -21,7 +25,7 @@ async function main() {
   const handle = startServer(canvas);
 
   const server = new Server(
-    { name: 'visualize', version: '0.3.0' },
+    { name: 'visualize', version: PKG_VERSION },
     {
       capabilities: {
         tools: {},
@@ -81,6 +85,12 @@ async function main() {
   };
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
+}
+
+async function readPackageVersion(): Promise<string> {
+  const url = new URL('./package.json', import.meta.url);
+  const pkg = JSON.parse(await Bun.file(url).text()) as { version?: string };
+  return pkg.version ?? '0.0.0';
 }
 
 async function assertD2Installed(): Promise<void> {

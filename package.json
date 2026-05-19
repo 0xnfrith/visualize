@@ -10,7 +10,8 @@
     "build:web": "bun run scripts/build-web.ts",
     "dev:web": "bun --hot run scripts/build-web.ts --watch",
     "test": "bun test",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "bump": "bun run scripts/bump.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
