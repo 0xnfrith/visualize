@@ -1,0 +1,30 @@
+#!/bin/bash
+set -euo pipefail
+
+missing=()
+command -v bun >/dev/null 2>&1 || missing+=("bun")
+command -v d2  >/dev/null 2>&1 || missing+=("d2")
+
+if (( ${#missing[@]} > 0 )); then
+  {
+    echo "[visualize] cannot start — missing required binaries on PATH: ${missing[*]}"
+    echo
+    echo "Install instructions:"
+    echo "  bun — https://bun.sh"
+    echo "    macOS:           brew install bun"
+    echo "    Linux/curl:      curl -fsSL https://bun.sh/install | bash"
+    echo "    (needs 'unzip' on Linux — apt-get install unzip, or download the"
+    echo "     release tarball direct from https://github.com/oven-sh/bun/releases)"
+    echo
+    echo "  d2 — https://d2lang.com"
+    echo "    macOS:           brew install d2"
+    echo "    Linux/curl:      curl -fsSL https://d2lang.com/install.sh | sh -s --"
+    echo "    Tarballs:        https://github.com/terrastruct/d2/releases"
+    echo
+    echo "After installing, fully restart Claude Code"
+    echo "(/reload-plugins does not respawn a failed MCP child)."
+  } >&2
+  exit 1
+fi
+
+exec bun run --cwd "${CLAUDE_PLUGIN_ROOT}" --silent start

@@ -12,14 +12,24 @@ Mermaid (state diagrams) is intentionally **not** in v0. The in-process path req
 
 ## Prerequisites
 
-- **[Bun](https://bun.sh)** — the runtime.
-- **[D2](https://d2lang.com)** on `PATH`:
+Both **[bun](https://bun.sh)** and **[d2](https://d2lang.com)** must be on `PATH` before the plugin can start.
+
+**macOS:**
 
 ```sh
-brew install d2
+brew install bun d2
 ```
 
-The plugin detects `d2` at startup and exits with a clear message if it's missing.
+**Linux (curl):**
+
+```sh
+curl -fsSL https://bun.sh/install | bash       # needs 'unzip' — apt-get install unzip
+curl -fsSL https://d2lang.com/install.sh | sh -s --
+```
+
+Release tarballs if curl-installers don't fit: [bun releases](https://github.com/oven-sh/bun/releases), [d2 releases](https://github.com/terrastruct/d2/releases).
+
+The plugin preflights both binaries before the MCP server is spawned (see `bin/visualize-server`) and prints a structured failure to the `/plugin` Errors tab if anything is missing. The same `d2` check also runs inside `server.ts` as a defensive inner guard.
 
 ## Install
 
