@@ -1,6 +1,6 @@
 {
   "name": "visualize",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Diagram-rendering canvas. Codex draws via D2 / raw SVG / image URLs; operator riffs on a tldraw surface. Requires `bun` and `d2` on PATH.",
   "author": {
     "name": "Nicholas Frith"
@@ -22,6 +22,9 @@
     "longDescription": "Gives the agent a diagram-rendering canvas. The agent generates D2 (or raw SVG, or an image URL); the plugin renders it server-side and pushes the result onto a tldraw surface the operator can pan, zoom, drag, and annotate. Requires `bun` and `d2` on PATH.",
     "developerName": "Nicholas Frith",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"]
+    "capabilities": [
+      "Read",
+      "Write"
+    ]
   }
 }
