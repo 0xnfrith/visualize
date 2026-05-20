@@ -17,25 +17,44 @@ The user wants you to draw or refine a diagram on the `visualize` board.
 Follow these steps in order. The user may pass a `<topic>` argument; the
 surrounding conversation is also part of the context.
 
-## Step 1 — Ensure the board is open AND learn the canvas theme
+## Step 1 — Open the board in the browser (MANDATORY, every invocation)
 
-Call `get_board_url` (no arguments). It returns
-`{ url, session_id, port, theme }` where `theme` is `'light'` or `'dark'` —
-the operator's current canvas color scheme. **Keep this value**, you'll use
-it in Step 4 to pick a contrasting D2 theme.
+This step has **two required actions**. Do BOTH on every `/visualize` call,
+even if you think the board is already open — sessions restart, the MCP
+port changes, and the operator cannot see anything you draw if the tab
+isn't pointing at the current session's URL. Skipping the `open` shell
+command is the single most common failure mode of this skill. Do not skip
+it.
+
+### 1a — Call `get_board_url`
+
+No arguments. It returns `{ url, session_id, port, theme }` where `theme`
+is `'light'` or `'dark'` — the operator's current canvas color scheme.
+**Keep `theme`**, you'll use it in Step 4 to pick a contrasting D2 theme.
 
 If the tool is unavailable, the visualize plugin is not active in this
 session; tell the user and stop.
 
-Then run:
+### 1b — Run `open "<url>"` in the shell
+
+You MUST invoke the Bash tool with the returned URL. This is non-optional
+and non-negotiable, regardless of:
+
+- whether you "think" the board is already open from a previous session
+- whether you just drew on it earlier in the conversation
+- whether the user only asked you to draw and didn't say "open"
+- whether the topic feels small enough to skip the ceremony
+
+Run it. Every time. Before any `draw` call.
 
 ```bash
 open "<url>"
 ```
 
 `open` is idempotent — calling it when the tab already exists just focuses
-it. On Linux substitute `xdg-open`, on Windows `start`. If none work, print
-the URL and ask the user to open it manually.
+it, costing nothing. On Linux substitute `xdg-open`, on Windows `start`.
+If none of those work in the current environment, print the URL and ask
+the user to open it manually — but try first.
 
 ## Step 2 — Decide what to draw
 

@@ -1,6 +1,6 @@
 {
   "name": "visualize",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Diagram-rendering canvas plugin for Claude Code",
   "license": "Apache-2.0",
   "type": "module",
