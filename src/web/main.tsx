@@ -4,6 +4,7 @@ import { Tldraw, type Editor } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { connectSocket } from './sync.ts';
 import { attachOperatorListeners } from './operator.ts';
+import { attachVimNav } from './vim-nav.ts';
 import { DiagramShapeUtil } from './diagram-shape.tsx';
 
 const SHAPE_UTILS = [DiagramShapeUtil];
@@ -22,11 +23,13 @@ function App() {
     }
     const socketHandle = connectSocket(editor);
     const detach = attachOperatorListeners(editor, socketHandle);
+    const detachVimNav = attachVimNav(editor);
     // Tldraw doesn't unmount during a session, but if it ever does we'd
     // want to clean up — keep the references for hot-reload safety.
     // `socketHandle.close()` stops the auto-reconnect chain in sync.ts.
     return () => {
       detach();
+      detachVimNav();
       socketHandle.close();
     };
   }, []);
