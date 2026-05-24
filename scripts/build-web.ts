@@ -43,6 +43,8 @@ const entryOutput = result.outputs.find(
 );
 const cssOutput = result.outputs.find(o => o.path.endsWith('.css'));
 
+const pkg = (await Bun.file(join(ROOT, 'package.json')).json()) as { version: string };
+
 const html = await Bun.file(join(SRC, 'index.html')).text();
 const entryName = entryOutput ? entryOutput.path.split('/').pop() : 'main.js';
 let rewritten = html.replace('./main.tsx', `/${entryName}`);
@@ -53,6 +55,8 @@ if (cssOutput) {
     `    <link rel="stylesheet" href="/${cssName}" />\n  </head>`
   );
 }
+const badge = `<div id="visualize-version-badge" style="position:fixed;top:8px;right:8px;z-index:9999;padding:4px 8px;background:rgba(15,23,42,0.85);color:#e2e8f0;font:12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid #334155;border-radius:4px;pointer-events:none;">v${pkg.version}</div>`;
+rewritten = rewritten.replace('<div id="root"></div>', `<div id="root"></div>\n    ${badge}`);
 await Bun.write(join(OUT, 'index.html'), rewritten);
 
 console.log(`[build:web] built ${result.outputs.length} files → ${OUT}`);
