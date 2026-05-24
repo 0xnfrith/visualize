@@ -19,7 +19,7 @@ Hardcoded for the `visualize` plugin in this repo: `bun run bump <ver>` and `bun
 
 - If `pwd` is not under `.claude/worktrees/`, call `EnterWorktree` to create one. All subsequent steps run there.
 - Read `.claude-plugin/plugin.json`. Capture `BASE_VERSION` — strip any trailing `-dev.*` suffix so repeated runs don't compound suffixes.
-- Capture `WT_SLUG = $(basename "$PWD")`.
+- Capture `WT_SLUG = $(basename "$PWD" | tr '_' '-')`. The `tr '_' '-'` matters: `bun run bump`'s regex `^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$` rejects underscores in the prerelease tag, and worktree names like `feature_x` are common.
 - Use TaskCreate for the four phases (Dev, Bump+Build, Test, Report) so the operator sees progress.
 
 ### 2. Dev phase
@@ -40,7 +40,7 @@ The dev subagent's contract (defined in `.claude/agents/dev.md`) returns three l
     SUMMARY: ...
     ACCEPTANCE: ...
 
-Parse all three. If parsing fails or the agent reports it couldn't do the work, stop and report.
+Parse all three. Validate that each value (the text after `: `) is non-empty and at least 8 characters. An empty or stub ACCEPTANCE means the tester has no criterion to verify and will produce a confusing failure — surface that to the operator and stop, do not proceed to test. If parsing fails or the agent reports it couldn't do the work, stop and report.
 
 ### 3. Bump + build
 
@@ -53,11 +53,11 @@ If either fails, stop and report.
 
 ### 4. Test phase
 
-Spawn the tester headlessly so it loads the worktree's plugin fresh via `--plugin-dir`:
+Spawn the tester headlessly so it loads the worktree's plugin fresh via `--plugin-dir`. **Build the prompt with `printf '%s'` to avoid shell-escape bugs** — the ACCEPTANCE value is free-form LLM output that may contain `"`, `$`, backticks, or `\`, which would break a naïve double-quoted string:
 
 ```bash
-claude --bg --agent tester --plugin-dir . --permission-mode bypassPermissions "ACCEPTANCE: <ACCEPTANCE line from dev>
-VERSION: $NEW_VERSION"
+PROMPT=$(printf 'ACCEPTANCE: %s\nVERSION: %s' "$ACCEPTANCE" "$NEW_VERSION")
+claude --bg --agent tester --plugin-dir . --permission-mode bypassPermissions "$PROMPT"
 ```
 
 Parse the job id from the `backgrounded · <id>` line (strip ANSI: `sed -E 's/\x1b\[[0-9;]*m//g'`).
@@ -67,6 +67,14 @@ Poll `~/.claude/jobs/<id>/state.json` every 5 seconds, up to 5 minutes. Wait for
 ### 5. Report + cleanup
 
 `claude rm <id>` (unless the test timed out — leave the job for inspection).
+
+**Restore the base version** so a stray `git commit -a` doesn't ship a dev tag to main:
+
+```bash
+bun run bump "$BASE_VERSION"
+```
+
+The dev subagent's code changes stay in the worktree; only the version files are reverted. The orchestrator does NOT rebuild after the restore — `dist/` is gitignored and the test verdict has already been captured.
 
 Print a markdown summary to the operator:
 
