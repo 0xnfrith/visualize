@@ -1,5 +1,6 @@
 import type { CanvasIndex } from '../canvas/index.ts';
 import type { RenderSpec } from '../canvas/types.ts';
+import { computeHints, type WorkflowGraph } from '../canvas/workflow.ts';
 import { render } from '../renderers/registry.ts';
 
 export interface ToolDescriptor {
@@ -7,6 +8,18 @@ export interface ToolDescriptor {
   description: string;
   inputSchema: Record<string, unknown>;
   handler: (args: any) => Promise<unknown>;
+}
+
+/**
+ * The single source of truth for what a workflow read returns — used by BOTH
+ * the `get_workflow` tool and the `visualize://workflow` MCP resource so their
+ * payloads can't drift. Returns the operator's currently-selected graph with
+ * server-computed `hints` filled in, or null when nothing is selected.
+ */
+export function buildWorkflowPayload(canvas: CanvasIndex): WorkflowGraph | null {
+  const graph = canvas.getWorkflow();
+  if (!graph) return null;
+  return { ...graph, hints: computeHints(graph) };
 }
 
 export function buildTools(
@@ -229,6 +242,32 @@ export function buildTools(
       async handler(args: { id: string; padding?: number; duration?: number }) {
         canvas.focus(args.id, args.padding, args.duration);
         return { ok: true, focused: args.id };
+      },
+    },
+
+    {
+      name: 'get_workflow',
+      description:
+        "Read the workflow graph the operator hand-drew on the canvas and use it to author a `.workflow.js` for the Claude Code Workflow tool. This is the INVERSE of `draw`: the operator sketches intent, you read it. Returns `{ workflow, theme }` — `workflow` is null when the operator hasn't drawn/selected one.\n\n" +
+        "SELECTION-SCOPED: you only see the shapes the operator currently has SELECTED. If `workflow` is null or sparse, ask them to select the workflow shapes (select-all for the whole thing) and call again.\n\n" +
+        '`workflow` has `nodes`, `edges`, and server-computed `hints`. Map each node `kind` to a Workflow primitive:\n' +
+        '- `agent` → `agent({ prompt, model, schema })` from `node.agent`. If `model` is absent, choose by task (haiku for cheap classification, sonnet/opus for heavy work).\n' +
+        '- `phase` → wrap its children in `phase(\'<label>\', …)`.\n' +
+        '- `parallel` → `await parallel([...])` over its children (barrier fan-out).\n' +
+        '- `pipeline` → `await pipeline(items, ...stages)` (no-barrier staged lane).\n' +
+        '- `workflow` → `await workflow({ scriptPath, name }, args)` from `node.workflowRef` — a child script. NOTE: `workflow()` is INLINED; the child runs in the parent journal/cache chain, no runtime boundary.\n' +
+        '- `gate` → a `needs_input` point: `return { status: \'needs_input\', question: <node.gate.question> }`. This is a RETURN-VALUE CONVENTION, not a runtime pause — the runtime will NOT stop for you.\n' +
+        '- `branch` → an `if`/`else if` over a classifier result; each arm matches a label in `node.branch.outLabels` and the outgoing edge whose `from.port` is that label.\n' +
+        '- `terminal` → a final `return { status: <node.terminal.status> }`.\n\n' +
+        'Edge `class`: `control` = sequencing / branch arms; `data` = arg/return threading (answer-back-down on resume — keep upstream agent prompts from referencing answer args so the cached prefix stays valid); `propagate` = an explicit needs_input bubble-up the operator drew.\n\n' +
+        'CRITICAL — propagation discipline. `hints.propagationPaths` lists, per gate, the `boundaryChain` of `workflow()` containers (outermost first) enclosing it. At EVERY boundary in that chain the generated parent MUST propagate:\n' +
+        '    const child = await workflow({ scriptPath }, args);\n' +
+        "    if (child && child.status === 'needs_input') return child;\n" +
+        'Omit it at any boundary and the parent runs to completion with the child half-done — the runtime will not catch it.\n\n' +
+        'Other hints: `entryNodes`/`topoOrder` → emit statements in topo order from the entry nodes. `loopBackEdges` → a "rejected → redo" loop; prefer the DISPATCHER-LOOP shape (return `{ status: \'rejected\' }` and let the operator re-invoke with an amended task) over an in-script `while` (which needs an explicit story for what changes each iteration). `danglingNodes`/`unknownContainerChildren` → shapes the operator drew but left unconnected or mis-parented; don\'t silently drop them — mention them and ask how they fit. Do not invent nodes the operator didn\'t draw; if the graph is ambiguous, ask before authoring the script.',
+      inputSchema: { type: 'object', properties: {} },
+      async handler() {
+        return { workflow: buildWorkflowPayload(canvas), theme: getTheme() };
       },
     },
   ];

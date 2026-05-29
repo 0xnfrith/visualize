@@ -148,6 +148,9 @@ function handleMessage(
     case 'browser.theme_changed':
       canvas.setTheme(msg.theme);
       return;
+    case 'browser.workflow_changed':
+      canvas.setWorkflow(msg.graph);
+      return;
   }
 }
 
