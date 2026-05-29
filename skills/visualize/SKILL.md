@@ -6,7 +6,10 @@ description: >-
   "visualize this system", "put X on the board", or wants a diagram rendered
   live alongside the conversation. With nothing selected and no topic it just
   opens the board; with a diagram already selected on the canvas, it refines
-  that one in place instead of creating a new one.
+  that one in place instead of creating a new one. Also handles the REVERSE
+  direction: when the operator has hand-drawn a workflow on the canvas (e.g.
+  "read my workflow", "turn this into a workflow script"), reads it via
+  get_workflow and authors a .workflow.js from it.
 disable-model-invocation: true
 user-invocable: true
 ---
@@ -82,6 +85,35 @@ Position and size are preserved automatically — never pass them on update.
 ### C — Draw something new
 Otherwise: compose new D2 source and call `draw` without an `id`. The
 server auto-places it on a grid.
+
+### D — Read a hand-drawn workflow (the reverse direction)
+This mode is the INVERSE of drawing: the operator sketches a workflow on the
+canvas using the workflow-primitive shapes (Agent, Gate, Branch, Terminal, and
+the Phase/Parallel/Pipeline/Sub-workflow containers, wired with Control/Data/
+Propagate connections), and you read it to author a `.workflow.js` for the
+Claude Code Workflow tool.
+
+Trigger: the operator says "I drew a workflow", "read my workflow", "turn this
+into a workflow script", or similar.
+
+1. **Tell the operator to SELECT the shapes** they want you to read — reading is
+   selection-scoped. Select-all (Ctrl/Cmd-A) grabs the whole drawing; a partial
+   selection reads just that subgraph. Nothing selected → empty.
+2. Call **`get_workflow`** (or read the `visualize://workflow` MCP resource). It
+   returns `{ workflow, theme }`. If `workflow` is null/empty, tell them you
+   don't see a selected workflow and stop.
+3. Map each node `kind` → Workflow primitive and honor `hints` — the
+   `get_workflow` tool description is the authoritative mapping. The
+   load-bearing rules:
+   - At every `workflow()` boundary in each `hints.propagationPaths[].boundaryChain`,
+     emit `const c = await workflow(...); if (c && c.status==='needs_input') return c`.
+   - For `hints.loopBackEdges`, prefer the dispatcher-loop shape (return
+     `{ status: 'rejected' }`) over an in-script `while`.
+   - Surface `hints.danglingNodes` / `unknownContainerChildren` to the operator
+     instead of silently dropping them; ask how they fit. Don't invent nodes.
+4. Write the `.workflow.js` with the Write tool (this is the one place this flow
+   leaves the canvas and touches the filesystem). Confirm the path with the
+   operator if it isn't obvious from context.
 
 ## Step 3 — Pick the right D2 shape
 

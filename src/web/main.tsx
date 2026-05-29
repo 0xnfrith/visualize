@@ -6,8 +6,15 @@ import { connectSocket } from './sync.ts';
 import { attachOperatorListeners } from './operator.ts';
 import { attachVimNav } from './vim-nav.ts';
 import { DiagramShapeUtil } from './diagram-shape.tsx';
+import { WfNodeShapeUtil } from './workflow/wf-node-shape.tsx';
+import { WfConnectionBindingUtil, WfConnectionShapeUtil } from './workflow/connection.tsx';
+import { WF_TOOLS } from './workflow/tools.ts';
+import { WfToolbar, wfUiOverrides } from './workflow/ui.tsx';
+import { attachWorkflowSerializer } from './workflow/operator-workflow.ts';
 
-const SHAPE_UTILS = [DiagramShapeUtil];
+const SHAPE_UTILS = [DiagramShapeUtil, WfNodeShapeUtil, WfConnectionShapeUtil];
+const BINDING_UTILS = [WfConnectionBindingUtil];
+const COMPONENTS = { Toolbar: WfToolbar };
 
 function App() {
   const onMount = useCallback((editor: Editor) => {
@@ -24,17 +31,28 @@ function App() {
     const socketHandle = connectSocket(editor);
     const detach = attachOperatorListeners(editor, socketHandle);
     const detachVimNav = attachVimNav(editor);
+    const detachWf = attachWorkflowSerializer(editor, socketHandle);
     // Tldraw doesn't unmount during a session, but if it ever does we'd
     // want to clean up — keep the references for hot-reload safety.
     // `socketHandle.close()` stops the auto-reconnect chain in sync.ts.
     return () => {
       detach();
       detachVimNav();
+      detachWf();
       socketHandle.close();
     };
   }, []);
 
-  return <Tldraw onMount={onMount} shapeUtils={SHAPE_UTILS} />;
+  return (
+    <Tldraw
+      onMount={onMount}
+      shapeUtils={SHAPE_UTILS}
+      bindingUtils={BINDING_UTILS}
+      tools={WF_TOOLS}
+      overrides={wfUiOverrides}
+      components={COMPONENTS}
+    />
+  );
 }
 
 const root = createRoot(document.getElementById('root')!);

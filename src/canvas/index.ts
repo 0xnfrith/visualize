@@ -1,6 +1,7 @@
 import type { ServerWebSocket } from 'bun';
 import type { ChannelEmitter } from '../mcp/channel.ts';
 import type { ServerMessage } from '../mcp/protocol.ts';
+import type { WorkflowGraph } from './workflow.ts';
 import type {
   Entry,
   OperatorEvent,
@@ -28,9 +29,30 @@ export class CanvasIndex {
   private placementRow = 0;
   private idCounter = 0;
   private channel: ChannelEmitter | null = null;
+  // The operator's currently-selected workflow graph (selection-scoped). The
+  // browser pushes a fresh snapshot on selection-change; null = nothing drawn
+  // /selected yet. Read by the `get_workflow` tool and the `visualize://workflow`
+  // MCP resource. Deliberately separate from `channel` — this is a pull store,
+  // not the (unused, being-removed) operator-event channel.
+  private workflow: WorkflowGraph | null = null;
+  private workflowNotifier: (() => void) | null = null;
 
   setChannel(channel: ChannelEmitter): void {
     this.channel = channel;
+  }
+
+  /** Called by the server to emit `notifications/resources/updated` on change. */
+  setWorkflowNotifier(notify: () => void): void {
+    this.workflowNotifier = notify;
+  }
+
+  setWorkflow(graph: WorkflowGraph): void {
+    this.workflow = graph;
+    this.workflowNotifier?.();
+  }
+
+  getWorkflow(): WorkflowGraph | null {
+    return this.workflow;
   }
 
   getTheme(): 'light' | 'dark' {

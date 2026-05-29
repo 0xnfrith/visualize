@@ -32,9 +32,19 @@ export type ServerMessage =
   | { type: 'diagram_removed'; id: string }
   | { type: 'focus'; id: string; padding?: number; duration?: number };
 
+// Re-export the workflow IR so client (operator-workflow.ts / serialize.ts) and
+// server can `import type { WorkflowGraph } from '.../protocol.ts'` — one shared
+// type source across the WS boundary, matching how BrowserMessage is imported.
+export type { WorkflowGraph } from '../canvas/workflow.ts';
+import type { WorkflowGraph } from '../canvas/workflow.ts';
+
 export type BrowserMessage =
   | { type: 'browser.subscribe' }
   | { type: 'browser.shape_moved'; id: string; position: { x: number; y: number } }
   | { type: 'browser.shape_removed'; id: string }
   | { type: 'browser.selection_changed'; ids: string[] }
-  | { type: 'browser.theme_changed'; theme: 'light' | 'dark' };
+  | { type: 'browser.theme_changed'; theme: 'light' | 'dark' }
+  // The browser serializes the operator's CURRENTLY-SELECTED workflow shapes
+  // into a WorkflowGraph (hints omitted — the server fills them on read) and
+  // pushes it on selection-change / edit-while-selected. Last-write-wins.
+  | { type: 'browser.workflow_changed'; graph: WorkflowGraph };
