@@ -13,6 +13,7 @@ import {
   type TLBaseBinding,
   type TLBaseShape,
   type TLShapeId,
+  type TLShapeUtilCanBindOpts,
   type VecModel,
 } from 'tldraw';
 import type { EdgeClass } from '../../canvas/workflow.ts';
@@ -46,8 +47,13 @@ export class WfConnectionShapeUtil extends ShapeUtil<WfConnectionShape> {
     return { start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, edgeClass: 'control' };
   }
 
-  override canBind() {
-    return false; // connections are not themselves bind targets
+  override canBind({ toShapeType }: TLShapeUtilCanBindOpts): boolean {
+    // A connection is always the `from` side of a wf-connection binding, bound
+    // TO a node. tldraw's canBindShapes() consults the FROM shape's canBind too,
+    // so a blanket `false` here silently dropped every connection→node binding
+    // (createBinding `continue`s past it with no error) — leaving connections
+    // permanently unbound. Allow node targets; still refuse to be a bind target.
+    return toShapeType === 'wf-node';
   }
   override canResize() {
     return false;

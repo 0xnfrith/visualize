@@ -28,29 +28,47 @@ export function getPortPagePosition(editor: Editor, shape: WfNodeShape, port: Po
   return editor.getShapePageTransform(shape).applyToPoint({ x: port.x, y: port.y });
 }
 
+/** px tolerance around a port dot. The dot renders 10px wide centered ON the
+ *  node edge, so half of it sits OUTSIDE the node's hit rectangle — a strict
+ *  `hitInside` test misses it. This radius lets the operator grab the dot. */
+const PORT_HIT_TOLERANCE = 18;
+
 /** Nearest port (optionally of a given terminal) to a page point, or null. */
 export function getPortAtPoint(
   editor: Editor,
   point: VecLike,
   terminal?: PortTerminal
 ): { shape: WfNodeShape; port: PortSpec } | null {
-  const hit = editor.getShapeAtPoint(point, {
-    hitInside: true,
-    filter: s => s.type === 'wf-node',
-  });
-  if (!hit) return null;
-  const shape = hit as WfNodeShape;
-  const ports = getNodePorts(shape).filter(p => !terminal || p.terminal === terminal);
-  let best: PortSpec | null = null;
+  let best: { shape: WfNodeShape; port: PortSpec } | null = null;
   let bestDist = Infinity;
-  for (const port of ports) {
-    const d = Vec.Dist(point, getPortPagePosition(editor, shape, port));
-    if (d < bestDist) {
-      bestDist = d;
-      best = port;
+  const consider = (shape: WfNodeShape) => {
+    const ports = getNodePorts(shape).filter(p => !terminal || p.terminal === terminal);
+    for (const port of ports) {
+      const d = Vec.Dist(point, getPortPagePosition(editor, shape, port));
+      if (d < bestDist) {
+        bestDist = d;
+        best = { shape, port };
+      }
     }
+  };
+
+  // 1) Nearest matching port across all nodes, within tolerance — grabs the dot
+  //    even where it overhangs the node edge.
+  for (const shape of editor.getCurrentPageShapes()) {
+    if (shape.type === 'wf-node') consider(shape as WfNodeShape);
   }
-  return best ? { shape, port: best } : null;
+  if (best && bestDist <= PORT_HIT_TOLERANCE) return best;
+
+  // 2) Otherwise fall back to the node under the point, so a connection can also
+  //    start by clicking anywhere inside a node's body (its nearest matching port).
+  const hit = editor.getShapeAtPoint(point, { hitInside: true, filter: s => s.type === 'wf-node' });
+  if (hit) {
+    best = null;
+    bestDist = Infinity;
+    consider(hit as WfNodeShape);
+    return best;
+  }
+  return null;
 }
 
 export class WfNodeShapeUtil extends BaseBoxShapeUtil<WfNodeShape> {

@@ -1,5 +1,4 @@
 import {
-  BaseBoxShapeTool,
   Mat,
   StateNode,
   createShapeId,
@@ -24,23 +23,91 @@ export interface WfToolDef {
 
 // ---- Placement tools (one per primitive) ----------------------------------
 
-function makePlaceTool(kind: WorkflowNodeKind): TLStateNodeConstructor {
-  return class extends BaseBoxShapeTool {
-    static override id = `wf-place-${kind}`;
-    override shapeType = 'wf-node';
-    override onCreate(shape: WfNodeShape | null): void {
-      if (!shape) return;
-      const base = defaultNodeProps(kind);
-      // Keep the drag-sized box; just stamp the kind + its defaults.
+/** Below this drag extent (page px, either axis) a gesture counts as a click. */
+const MIN_DRAG = 20;
+
+/**
+ * Custom placement tool — deliberately NOT `BaseBoxShapeTool`. Two reasons the
+ * box tool was wrong here:
+ *   1. its drag path creates a `{w:1,h:1}` shape, so a small drag stamped a
+ *      1px node that collapsed to a dot; and
+ *   2. its click path never runs `onCreate` and `getDefaultProps` can't know
+ *      the kind, so a single click always produced an Agent.
+ * This tool stamps the CORRECT kind at the primitive's default size on a click
+ * (centered on the press), and sizes to the drag box on a deliberate drag.
+ */
+class WfPlaceToolBase extends StateNode {
+  static override id = 'wf-place';
+  kind: WorkflowNodeKind = 'agent';
+  private shapeId: TLShapeId | null = null;
+
+  override onPointerDown(): void {
+    const p = this.editor.inputs.originPagePoint;
+    const base = defaultNodeProps(this.kind);
+    const id = createShapeId();
+    this.shapeId = id;
+    this.editor.markHistoryStoppingPoint();
+    this.editor.createShape<WfNodeShape>({
+      id,
+      type: 'wf-node',
+      x: p.x - base.w / 2,
+      y: p.y - base.h / 2,
+      props: base,
+    });
+  }
+
+  override onPointerMove(): void {
+    const id = this.shapeId;
+    if (!id || !this.editor.inputs.isDragging) return;
+    const { originPagePoint: o, currentPagePoint: c } = this.editor.inputs;
+    const base = defaultNodeProps(this.kind);
+    this.editor.updateShape<WfNodeShape>({
+      id,
+      type: 'wf-node',
+      x: Math.min(o.x, c.x),
+      y: Math.min(o.y, c.y),
+      props: { ...base, w: Math.max(Math.abs(c.x - o.x), 1), h: Math.max(Math.abs(c.y - o.y), 1) },
+    });
+  }
+
+  override onPointerUp(): void {
+    const id = this.shapeId;
+    if (!id) return;
+    this.shapeId = null;
+    const { originPagePoint: o, currentPagePoint: c } = this.editor.inputs;
+    const base = defaultNodeProps(this.kind);
+    // A click (or a too-small drag) → default size centered on the press point.
+    if (Math.abs(c.x - o.x) < MIN_DRAG || Math.abs(c.y - o.y) < MIN_DRAG) {
       this.editor.updateShape<WfNodeShape>({
-        id: shape.id,
+        id,
         type: 'wf-node',
-        props: { ...base, kind, w: shape.props.w || base.w, h: shape.props.h || base.h },
+        x: o.x - base.w / 2,
+        y: o.y - base.h / 2,
+        props: base,
       });
-      if (PRIMITIVES[kind].group === 'container') this.editor.sendToBack([shape.id]);
-      // Return to the select tool so the operator can immediately arrange/edit.
-      this.editor.setCurrentTool('select');
     }
+    if (PRIMITIVES[this.kind].group === 'container') this.editor.sendToBack([id]);
+    this.editor.setSelectedShapes([id]);
+    this.editor.setCurrentTool('select');
+  }
+
+  override onCancel(): void {
+    if (this.shapeId) {
+      this.editor.deleteShapes([this.shapeId]);
+      this.shapeId = null;
+    }
+    this.editor.setCurrentTool('select');
+  }
+
+  override onInterrupt(): void {
+    this.onCancel();
+  }
+}
+
+function makePlaceTool(kind: WorkflowNodeKind): TLStateNodeConstructor {
+  return class extends WfPlaceToolBase {
+    static override id = `wf-place-${kind}`;
+    override kind = kind;
   } as unknown as TLStateNodeConstructor;
 }
 
