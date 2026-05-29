@@ -52,23 +52,25 @@ export function getPortAtPoint(
     }
   };
 
-  // 1) Nearest matching port across all nodes, within tolerance — grabs the dot
-  //    even where it overhangs the node edge.
+  // 1) Prefer the node under the point — unambiguous, and matches clicking a
+  //    node's body or the inner half of a port dot. (Picking the globally
+  //    nearest port first could grab a neighbouring node's port when two nodes
+  //    sit within tolerance of each other.)
+  const hit = editor.getShapeAtPoint(point, { hitInside: true, filter: s => s.type === 'wf-node' });
+  if (hit) {
+    consider(hit as WfNodeShape);
+    if (best) return best;
+    // Hit node has no matching-terminal port (e.g. a port-less container) — fall through.
+    best = null;
+    bestDist = Infinity;
+  }
+
+  // 2) Point is outside every node (e.g. on the outer half of a port dot, which
+  //    straddles the node edge): take the nearest matching port within tolerance.
   for (const shape of editor.getCurrentPageShapes()) {
     if (shape.type === 'wf-node') consider(shape as WfNodeShape);
   }
-  if (best && bestDist <= PORT_HIT_TOLERANCE) return best;
-
-  // 2) Otherwise fall back to the node under the point, so a connection can also
-  //    start by clicking anywhere inside a node's body (its nearest matching port).
-  const hit = editor.getShapeAtPoint(point, { hitInside: true, filter: s => s.type === 'wf-node' });
-  if (hit) {
-    best = null;
-    bestDist = Infinity;
-    consider(hit as WfNodeShape);
-    return best;
-  }
-  return null;
+  return best && bestDist <= PORT_HIT_TOLERANCE ? best : null;
 }
 
 export class WfNodeShapeUtil extends BaseBoxShapeUtil<WfNodeShape> {

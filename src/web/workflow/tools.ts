@@ -1,11 +1,12 @@
 import {
   Mat,
   StateNode,
+  Vec,
   createShapeId,
   type TLShapeId,
   type TLStateNodeConstructor,
 } from 'tldraw';
-import type { EdgeClass, WorkflowNodeKind } from '../../canvas/workflow.ts';
+import { isContainerKind, type EdgeClass, type WorkflowNodeKind } from '../../canvas/workflow.ts';
 import { PRIMITIVES, defaultNodeProps } from './primitives.ts';
 import { getPortAtPoint, type WfNodeShape } from './wf-node-shape.tsx';
 import {
@@ -23,7 +24,7 @@ export interface WfToolDef {
 
 // ---- Placement tools (one per primitive) ----------------------------------
 
-/** Below this drag extent (page px, either axis) a gesture counts as a click. */
+/** Below this drag distance (page px) a gesture counts as a click, not a drag. */
 const MIN_DRAG = 20;
 
 /**
@@ -58,8 +59,11 @@ class WfPlaceToolBase extends StateNode {
 
   override onPointerMove(): void {
     const id = this.shapeId;
-    if (!id || !this.editor.inputs.isDragging) return;
+    if (!id) return;
     const { originPagePoint: o, currentPagePoint: c } = this.editor.inputs;
+    // Don't size until the gesture is a deliberate drag; below the threshold it
+    // stays a default-size click (and we avoid throwaway shrink-then-restore writes).
+    if (Vec.Dist(o, c) < MIN_DRAG) return;
     const base = defaultNodeProps(this.kind);
     this.editor.updateShape<WfNodeShape>({
       id,
@@ -76,8 +80,9 @@ class WfPlaceToolBase extends StateNode {
     this.shapeId = null;
     const { originPagePoint: o, currentPagePoint: c } = this.editor.inputs;
     const base = defaultNodeProps(this.kind);
-    // A click (or a too-small drag) → default size centered on the press point.
-    if (Math.abs(c.x - o.x) < MIN_DRAG || Math.abs(c.y - o.y) < MIN_DRAG) {
+    // A click (movement below the drag threshold) → default size centered on the
+    // press point; a deliberate drag keeps the size onPointerMove already set.
+    if (Vec.Dist(o, c) < MIN_DRAG) {
       this.editor.updateShape<WfNodeShape>({
         id,
         type: 'wf-node',
@@ -86,7 +91,7 @@ class WfPlaceToolBase extends StateNode {
         props: base,
       });
     }
-    if (PRIMITIVES[this.kind].group === 'container') this.editor.sendToBack([id]);
+    if (isContainerKind(this.kind)) this.editor.sendToBack([id]);
     this.editor.setSelectedShapes([id]);
     this.editor.setCurrentTool('select');
   }
